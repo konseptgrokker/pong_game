@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>PONG</title>
+  </head>
+  <body>
+    <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+<script>
+const ZOOM = 0.45;
+const RADIUS = 20;
+const PADDLE_THICKNESS = 30;
+const PADDLE_HEIGHT = 200;
+const DIFFICULTY = 25;
+const BALL_CONTROL = 10;
+const POINTS_NEEDED = 10;
+const BALL_SPEED = 25;
+
+var canvas;
+var canvasContext;
+var framesPerSecond = 60;
+var isPaused = false;
+var winScreen = false;
+var winner;
+var scoreP1 = 0;
+var scoreP2 = 0;
+
+var ballX = 900;
+var ballY = 500;
+var ballSpeedX = BALL_SPEED;
+var ballSpeedY = 0;
+var actualSpeed = BALL_SPEED;
+var paddle1Y;
+var paddle2Y;
+var halfPaddle = PADDLE_HEIGHT/2;
+
+function mousePosition(evt) {
+    var rect = canvas.getBoundingClientRect();
+    // why is this?
+    var xPos = evt.clientX/ZOOM - rect.left - document.documentElement.scrollLeft;
+    var yPos = evt.clientY/ZOOM - rect.top - document.documentElement.scrollTop;
+    return {
+        x: xPos,
+        y: yPos,
+    };
+}
+
+window.onload = function() {
+    canvas = document.getElementById('gameCanvas');
+    canvasContext = canvas.getContext('2d');
+    // Zoom fix:
+    document.getElementsByTagName("BODY")[0].style.zoom = 
+    (ZOOM*100).toString() + "%";
+
+    setInterval(function() {
+        if (!isPaused) {
+            move();
+            draw();
+        }
+    }, 1000/framesPerSecond);
+
+    canvas.addEventListener('mousemove', function(evt) {
+    var mousePos = mousePosition(evt);
+    paddle1Y = mousePos.y;
+    }); 
+};
+
+function move() {
+    ballX += ballSpeedX;
+    ballY += ballSpeedY;
+    // increment ballspeed to prevent stalemate
+    actualSpeed+=0.01;
+
+   // Check if ball should return:
+    if(ballX-RADIUS < PADDLE_THICKNESS && 
+    ballY > paddle1Y-halfPaddle && 
+    ballY < paddle1Y+halfPaddle) {
+        // Y-speed is in range -ballspeed to ballspeed when hits paddle
+        ballSpeedY = actualSpeed*(ballY-paddle1Y)/halfPaddle;
+        // Decrease X-speed so the vector stays the same (also change direction)
+        ballSpeedX = actualSpeed*Math.cos(Math.atan(ballSpeedY/Math.abs(ballSpeedX)));
+    }
+
+    if(ballX+RADIUS>canvas.width-PADDLE_THICKNESS && 
+    ballY > paddle2Y - halfPaddle && 
+    ballY < paddle2Y + halfPaddle) {
+        ballSpeedY = actualSpeed*(ballY - paddle2Y)/halfPaddle;
+        ballSpeedX = actualSpeed* -Math.cos(Math.atan(ballSpeedY/Math.abs(ballSpeedX)));
+    }
+
+    if(ballY+RADIUS > canvas.height || ballY-RADIUS < 0) {
+        ballSpeedY = -ballSpeedY;
+        console.log(actualSpeed);
+    }
+
+    //Check if ball should reset:
+    if (ballX < 0){
+            scoreP2++;
+        if(scoreP2 >= POINTS_NEEDED) {
+            winScreen = true;
+            isPaused = true;
+            winner = "Player 2";
+            setTimeout(function() {
+                isPaused = false;
+                winScreen = false;
+                scoreP1 = 0;
+                scoreP2 = 0;
+            }, 4000);
+        } else {
+            isPaused = true;
+            setTimeout(function() {
+                isPaused = false;
+            }, 400);
+        }
+        actualSpeed = BALL_SPEED;
+        ballX = canvas.width*0.25;
+        ballY = canvas.height/2;
+        ballSpeedY = 0;
+        ballSpeedX = Math.abs(actualSpeed);
+    }
+
+    if(ballX > canvas.width){
+        scoreP1++;
+        if(scoreP1 >= POINTS_NEEDED) {
+            winScreen = true;
+            isPaused = true;
+            winner = "Player 1";
+            setTimeout(function() {
+                isPaused = false;
+                winScreen = false;
+                scoreP1 = 0;
+                scoreP2 = 0;
+            }, 4000);
+        } else {
+            isPaused = true;
+            setTimeout(function() {
+                isPaused = false;
+            }, 400);
+        }
+        actualSpeed = BALL_SPEED;
+        ballX = canvas.width*0.75;
+        ballY = canvas.height/2;
+        ballSpeedY = 0;
+        ballSpeedX = -Math.abs(actualSpeed);
+    }
+    // Paddle "AI"
+    if(ballY > paddle2Y+DIFFICULTY){
+        paddle2Y += DIFFICULTY;
+    } else if(ballY < paddle2Y-DIFFICULTY){
+        paddle2Y -= DIFFICULTY;
+    } else {
+        paddle2Y = ballY;
+    }
+}
+
+function draw() {
+    colorRect(0,0,canvas.width,canvas.height,'black');
+    // Table:
+    colorRect(canvas.width/2-5, 0, 10, canvas.height, "white");
+    canvasContext.beginPath();
+    canvasContext.strokeStyle = "white";
+    canvasContext.lineWidth = 10;
+    canvasContext.arc(canvas.width/2,canvas.height/2,
+    120,0,Math.PI*2);
+    canvasContext.stroke();
+    canvasContext.font = "150px Arial Black";
+    canvasContext.textAlign = "center";
+    canvasContext.strokeText(scoreP1, canvas.width*0.2, canvas.height/2);
+    canvasContext.strokeText(scoreP2, canvas.width*0.8, canvas.height/2);
+    // Left player paddle
+    colorRect(0, paddle1Y-halfPaddle,PADDLE_THICKNESS,PADDLE_HEIGHT,'white');
+    // Right computer paddle
+    colorRect(canvas.width-PADDLE_THICKNESS,paddle2Y-halfPaddle,
+    PADDLE_THICKNESS,PADDLE_HEIGHT,'white');
+    // next line draw the ball
+    colorCircle(ballX, ballY, RADIUS, 'white');
+    if(winScreen){
+        canvasContext.fillStyle = "gold";
+        canvasContext.fillText(winner+" is the winner!", 
+        canvas.width/2+20,canvas.height/4);
+    }
+}
+function colorCircle(centerX, centerY, drawColor) {
+canvasContext.fillStyle = drawColor;
+canvasContext.beginPath();
+canvasContext.arc(centerX, centerY, RADIUS, 0,Math.PI*2, true);
+canvasContext.fill();
+}
+function colorRect(leftX,topY,width,height, drawColor) {
+canvasContext.fillStyle = drawColor;
+canvasContext.fillRect(leftX,topY,width,height);
+}
+</script>
+  </body>
+</html>
